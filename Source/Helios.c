@@ -64,30 +64,29 @@ int main(int argc, char *argv[])
   char inputFileName[500];
   if(argc != 6) 
   {
-    fprintf(stderr, "\nPlease provide the following arguments in order via the command line:
-    Number of lines in the file\nDimensionality (number of coordinates per point)\n
-    Tile size\nFilename of the data set.\nThread count\n");
+    fprintf(stderr, "\nPlease provide the following arguments in order via the command line:\nNumber of lines in the file\nDimensionality (Number of coordinates per point)\nTile size\nThread count\nFilename of the dataset\n");
     MPI_Finalize();
     exit(0);
   }
   sscanf(argv[1], "%d", &N);
   sscanf(argv[2], "%d", &DIM);
   sscanf(argv[3], "%d", &tileSize);
-  strcpy(inputFileName, argv[4]);
   sscanf(argv[4],"%d",&threadCount);
-  omp_set_num_threads(threadCount);
+  omp_set_num_threads(threadCount);  
+  strcpy(inputFileName, argv[5]);
 
+  // Typical edge case:
   if(N < 1 || DIM < 1)
   {
     fprintf(stderr, "\nInput parameters are invalid!\n");
     MPI_Finalize();
     exit(0);
   }
-  else // All ranks import the dataset:
+  else
   {
     if(!rank) 
-        fprintf(stdout, "\nNumber of lines (N): %d, Dimensionality: %d, Block size: %d, Filename: %s\n", N, DIM, tileSize, inputFilename); 
-    // Allocating memory for the dataset:
+        fprintf(stdout, "\nNumber of lines: %d, Dimensionality: %d, Tile size: %d, Thread Count: %d, Filename: %s\n", N, DIM, tileSize, threadCount, inputFileName); 
+    // Making all ranks import the dataset and then allocate memory for it:
     dataSet = (double**)malloc(sizeof(double*) * N);
     for(int i = 0; i < N; i++)
     {
@@ -168,7 +167,7 @@ int main(int argc, char *argv[])
   if(!rank) 
   {
     endTime = MPI_Wtime();
-    fprintf(stdout, "Time taken to compute the distance matrix in parallel using %d processes and %d threads: %f seconds\n", processCount, threadCount, endTime - startTime);   
+    fprintf(stdout, "Time taken to compute the distance matrix in parallel (hybrid setup with multiple OpenMP threads and MPI processes): %f seconds\n", endTime - startTime);   
   }
 
   // Computing the local sum in all ranks and then sending those to rank 0 for a reduction on it:
@@ -180,7 +179,7 @@ int main(int argc, char *argv[])
   }
   MPI_Reduce(&localSum, &globalSum, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
   if(!rank) 
-  {
+  { // Sanity check: (printing the integer value, which should match with the output from the sequential version. There should be no diff output for this line, given that the only difference here would be in floating point units)
     fprintf(stdout, "Sum of all the distances computed: %d\n", globalSum);
   }
 
