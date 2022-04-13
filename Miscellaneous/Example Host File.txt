@@ -1,0 +1,2 @@
+# Set the maximum number of process ranks (or core count) to test locally:
+localhost slots = 64
