@@ -84,8 +84,7 @@ int main(int argc, char *argv[])
   }
   else
   {
-    if(!rank) 
-        fprintf(stdout, "\nNumber of lines: %d, Dimensionality: %d, Tile size: %d, Thread Count: %d, Filename: %s\n", N, DIM, tileSize, threadCount, inputFileName); 
+    // if(!rank) fprintf(stdout, "\nNumber of lines: %d, Dimensionality: %d, Tile size: %d, Thread Count: %d, Filename: %s\n", N, DIM, tileSize, threadCount, inputFileName); 
     // Making all ranks import the dataset and then allocate memory for it:
     dataSet = (double**)malloc(sizeof(double*) * N);
     for(int i = 0; i < N; i++)
@@ -167,7 +166,7 @@ int main(int argc, char *argv[])
   if(!rank) 
   {
     endTime = MPI_Wtime();
-    fprintf(stdout, "Time taken to compute the distance matrix in parallel (hybrid setup with multiple OpenMP threads and MPI processes): %f seconds\n", endTime - startTime);   
+    fprintf(stdout, "Time taken to compute the distance matrix in parallel: %f seconds\n", endTime - startTime);   
   }
 
   // Computing the local sum in all ranks and then sending those to rank 0 for a reduction on it:
@@ -179,8 +178,8 @@ int main(int argc, char *argv[])
   }
   MPI_Reduce(&localSum, &globalSum, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
   if(!rank) 
-  { // Sanity check: (printing the integer value, which should match with the output from the sequential version. There should be no diff output for this line, given that the only difference here would be in floating point units)
-    fprintf(stdout, "Sum of all the distances computed: %d\n", globalSum);
+  { // Sanity check:
+    fprintf(stdout, "Sum of all the distances computed: %f\n", globalSum);
   }
 
   // Deallocating memory for the data set, distance matrix and range variables:
