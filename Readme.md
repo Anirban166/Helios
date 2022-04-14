@@ -62,7 +62,19 @@ mpirun -np <processcount> -hostfile <hostfilename>.<hostfileextension> ./Helios 
 ```
 Simply creating a text file that specifies the localhost slots to designate the maximum number of processes possible ([example](https://github.com/Anirban166/Helios/blob/main/Miscellaneous/Example%20Host%20File.txt)) will do for the hostfile.
 
-If you're using a compute cluster (looks at the mirror again) that uses Slurm, use `srun` instead of `mpirun`, and switch accordingly based on your scheduler. 
+If you're using a compute cluster (looks at the mirror again) that uses Slurm, use `srun` instead of `mpirun`, and switch accordingly based on your scheduler. Parameters for clusters would vary, but for `#SBATCH` prefixed options, here are some insights based on my specifications:
+```sh
+--time=00:01:00       # How long do you estimate the computation to run? Go a few seconds above that value to be safe (or to avoid timeouts).
+--mem=80000          # Emplace a reasonable value for the memory (in MiB) you would want to allocate, which again, depends upon your rough calculations.
+--nodes=1           # Specify the node count. (use if you're familiar with distribution of ranks across nodes; I'd append --nodes=$nodeCount --ntasks-per-node=$ranksPerNode to srun to avoid discrepancies)
+-C amd             # Specify the processor type.
+-c 64             # Specify the number of threads you would want per task.
+--ntasks=64        # Specify the number of process ranks or tasks.
+--exclusive         # Get the entire node (or nodes) for yourself. (hard requisite for greedy ones)
+--cpus-per-task=1    # Specify the number of CPU cores allotted per MPI process/task.
+--ntasks-per-socket=1 # Specify number of MPI ranks to place per socket.
+```
+MPI ranks can be tied to nodes and sockets as well (one per each), so there's plenty of room for experimentation and customization of how you run Helios.
 
 Feel free to experiment with different combinations of processes and threads. For instance, here's a stub to test with different process counts whilst keeping the tile size and thread count fixed:
 ```sh
@@ -74,7 +86,7 @@ arrayLength=${#processCount[@]}
 # Loop through the different process counts and execute Helios:
 for((i = 0; i < ${arrayLength}; i++)); 
 do    
-  echo -e "\nRunning the distance matrix computation in parallel with ${processCount[$i]} processes, 2 threads per process and a tile size of (500 x 500):"
+  echo -e "\nRunning the distance matrix computation with ${processCount[$i]} processes, 2 threads per process and a tile size of (500 x 500):"
   srun -n${processCount[$i]} ./Helios 100000 90 500 MillionSongDataset.txt $(threadCount)
 done
 ```
