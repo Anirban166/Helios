@@ -2,8 +2,6 @@
   Author: Anirban166/Ani
   Email:  ac4743@nau.edu
 ------------------------*/
-// Compile using: mpicc -O3 -fopenmp Helios.c -lm -o Helios
-// Execute using: mpirun -np <processcount> -hostfile <hostfilename>.<hostfileextension> ./Helios <numberoflines> <dimensionality> <filename> <threadcount>
 #include <omp.h>
 #include <mpi.h>
 #include <math.h>
