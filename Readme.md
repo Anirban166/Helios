@@ -21,7 +21,7 @@ Core features include tiling the distance matrix (allows 2D tile-based accesses 
 Notes
 </h2>
 
-Note that small to medium tile sizes are usually preferable, depending upon the cache size in your machine (for instance, a tile length of 5000 and over would be overkill, given that it would exceed the ordinary cache size). The very idea of a tiled approach is to be able to re-use the cached entries for each object, and since the objects in such computational problems are considerably large (mostly due to the high dimensionality, for instance computations across 90 doubles are in play for each inner loop iteration when dealing with the Million Song dataset), a smaller tile size will be much more performant than a larger one. The improvement in cache hits or the decrease in cache misses (as reported by perf for each process) can be seen from the drop for the ratio of the latter is to the former metric (cache misses/cache hits, and times a hundred for the percentage) when compared against the regular version with row-based ingress. 
+Note that small to medium tile sizes are usually preferable, depending upon the cache size in your machine (for instance, a tile length of 5000 and over would be overkill, given that it would exceed the ordinary cache size). The very idea of a tiled approach is to be able to re-use the cached entries for each object, and since the objects in such computational problems are considerably large (mostly due to the high dimensionality, for instance computations across 90 doubles are in play for each inner loop iteration when dealing with the Million Song dataset), a smaller tile size will be much more performant than a larger one.
 
 Also note that the tiled solution is in fact, an optimization, and optimizations often reduce the room for parallelization, or make it less effective (i.e., it reduces the parallel scaling, as can be observed by evaluating the speedup). There are several other trivial optimizations that I can think of (but are not incorporated here for the same reason), such as for instance, exactly N (size of the dataset, or the number of lines in it) elements will be zero across the diagonals (or at i equals j for two nested loops that run through the matrix elements, with loop variables i and j) and at least half of the rest will be duplicates, so I can precompute the diagonals and just compute one half of the rest elements in the matrix. Avoiding this allows me to have more work, which in turn allows my parallelization to scale better (with increasing core count).
 
@@ -55,12 +55,39 @@ This would be good to go in any Linux machine, or most cluster-based environment
 Execution
 </h2>
 
-The program takes as input five command line arguments (apart from the executable, naturally), which are in order, the number of lines in the dataset, the dimensionality of it, the tile size, the thread count and the name of the dataset or the full path to it (if not in the current directory of access). Supply these arguments to `mpirun` after specifying the process count and the hostfile: <br>
-<br>
+The program takes as input five command line arguments (apart from the executable, naturally), which are in order, the number of lines in the dataset, the dimensionality of it, the tile size, the thread count and the name of the dataset or the full path to it (if not in the current directory of access). Supply these arguments to `mpirun` after specifying the process count and the hostfile:
 
 ```sh
 mpirun -np <processcount> -hostfile <hostfilename>.<hostfileextension> ./Helios <numberoflines> <dimensionality> <tilesize> <filename> <threadcount>
 ```
 Simply creating a text file that specifies the localhost slots to designate the maximum number of processes possible ([example](https://github.com/Anirban166/Helios/blob/main/Miscellaneous/Example%20Host%20File.txt)) will do for the hostfile.
 
-If you're using a compute cluster (looks at the mirror again) that uses Slurm, use `srun` instead of `mpirun`, and switch accordingly based on your scheduler.
+If you're using a compute cluster (looks at the mirror again) that uses Slurm, use `srun` instead of `mpirun`, and switch accordingly based on your scheduler. 
+
+Feel free to experiment with different combinations of processes and threads. For instance, here's a stub to test with different process counts whilst keeping the tile size and thread count fixed:
+```sh
+threadCount=2
+# Declare an array to hold different process counts:
+declare -a processCount=(2 4 8 12 16 20 30 40 50 64)
+# Extract the length of it in a variable:
+arrayLength=${#processCount[@]}
+# Loop through the different process counts and execute Helios:
+for((i = 0; i < ${arrayLength}; i++)); 
+do    
+  echo -e "\nRunning the distance matrix computation in parallel with ${processCount[$i]} processes, 2 threads per process and a tile size of (500 x 500):"
+  srun -n${processCount[$i]} ./Helios 100000 90 500 MillionSongDataset.txt $(threadCount)
+done
+```
+Similarly, tile sizes can be tweaked to find the sweet spot for your dataset or particular use-case:
+```sh
+threadCount=2
+processCount=64
+declare -a blockSize=(25 100 500 1000 2000)
+arrayLength=${#blockSize[@]}
+for((i = 0; i < ${arrayLength}; i++)); 
+do    
+  echo -e "\nRunning the distance matrix computation with 64 processes, 2 threads per process and a tile size of (${blockSize[$i]} x ${blockSize[$i]}):"
+  srun -n$(processCount) /usr/bin/perf stat -B -e cache-references,cache-misses ./Helios 100000 90 ${blockSize[$i]} MillionSongDataset.txt $(threadCount)
+done
+```
+Note the I'm using the `perf` tool above to obtain metrics such as the cache references and misses above (which are then written to a file using `stderr` to not clog the general output), which can often times be beneficial to see the cache utilization. For instance, the improvement in cache hits or the decrease in cache misses (as reported by `perf` for each process) can be seen from the drop for the ratio of the latter is to the former metric (cache misses/cache hits, and times a hundred for the percentage) when comparing this tiled approach in Helios against the regular version with row-based ingress.
