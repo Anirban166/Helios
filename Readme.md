@@ -18,15 +18,6 @@ Core features include tiling the distance matrix (allows 2D tile-based accesses 
 
 ---
 <h2 align = "center">
-Notes
-</h2>
-
-Note that small to medium tile sizes are usually preferable, depending upon the cache size in your machine (for instance, a tile length of 5000 and over would be overkill, given that it would exceed the ordinary cache size). The very idea of a tiled approach is to be able to re-use the cached entries for each object, and since the objects in such computational problems are considerably large (mostly due to the high dimensionality, for instance computations across 90 doubles are in play for each inner loop iteration when dealing with the Million Song dataset), a smaller tile size will be much more performant than a larger one.
-
-Also note that the tiled solution is in fact, an optimization, and optimizations often reduce the room for parallelization, or make it less effective (i.e., it reduces the parallel scaling, as can be observed by evaluating the speedup). There are several other trivial optimizations that I can think of (but are not incorporated here for the same reason), such as for instance, exactly N (size of the dataset, or the number of lines in it) elements will be zero across the diagonals (or at i equals j for two nested loops that run through the matrix elements, with loop variables i and j) and at least half of the rest will be duplicates, so I can precompute the diagonals and just compute one half of the rest elements in the matrix. Avoiding this allows me to have more work, which in turn allows my parallelization to scale better (with increasing core count).
-
----
-<h2 align = "center">
 Performance
 </h2>
 
@@ -43,7 +34,7 @@ Note that this has been tested on a compute cluster. A caveat here would be to n
 Compilation
 </h2>
 
-Compile using the highest optimization level (same agenda followed with the sequential version for a fair comparison) to save some time (unless you can generate optimal assembly or machine language from my code) and explicitly link the maths library in case it isn't being tied together: (if you happen to encounter undefined references to functions from `math.h` like the call to `sqrt()` that is being used) 
+Compile using the highest optimization level (same agenda followed with the sequential version for a fair comparison) to generate the optimal machine code for Helios (saving some time) and explicitly link the maths library in case it isn't being tied together: (if you happen to encounter undefined references to functions from `math.h` like the call to `sqrt()` that is being used) 
 
 ```sh
 mpicc -O3 -fopenmp Helios.c -lm -o Helios
@@ -94,12 +85,28 @@ Similarly, tile sizes can be tweaked to find the sweet spot for your dataset or 
 ```sh
 threadCount=2
 processCount=64
-declare -a blockSize=(25 100 500 1000 2000)
-arrayLength=${#blockSize[@]}
+declare -a tileSize=(25 100 500 1000 2000)
+arrayLength=${#tileSize[@]}
 for((i = 0; i < ${arrayLength}; i++)); 
 do    
-  echo -e "\nRunning the distance matrix computation with 64 processes, 2 threads per process and a tile size of (${blockSize[$i]} x ${blockSize[$i]}):"
-  srun -n$(processCount) /usr/bin/perf stat -B -e cache-references,cache-misses ./Helios 100000 90 ${blockSize[$i]} MillionSongDataset.txt $(threadCount)
+  echo -e "\nRunning the distance matrix computation with 64 processes, 2 threads per process and a tile size of (${tileSize[$i]} x ${tileSize[$i]}):"
+  srun -n$(processCount) /usr/bin/perf stat -B -e cache-references,cache-misses ./Helios 100000 90 ${tileSize[$i]} MillionSongDataset.txt $(threadCount)
 done
 ```
 Note the I'm using the `perf` tool above to obtain metrics such as the cache references and misses above (which are then written to a file using `stderr` to not clog the general output), which can often times be beneficial to see the cache utilization. For instance, the improvement in cache hits or the decrease in cache misses (as reported by `perf` for each process) can be seen from the drop for the ratio of the latter is to the former metric (cache misses/cache hits, and times a hundred for the percentage) when comparing this tiled approach in Helios against the regular version with row-based ingress.
+
+---
+<h2 align = "center">
+Notes
+</h2>
+
+Small to medium tile sizes are usually preferable, depending upon the cache size in your machine (for instance, a tile length of 5000 and over would be overkill, given that it would exceed the ordinary cache size). The very idea of a tiled approach is to be able to re-use the cached entries for each object, and since the objects in such computational problems are considerably large (mostly due to the high dimensionality, for instance computations across 90 doubles are in play for each inner loop iteration when dealing with the Million Song dataset), a smaller tile size will be much more performant than a larger one.
+
+Also note that the tiled solution is in fact, an optimization, and optimizations often reduce the room for parallelization, or make it less effective (i.e., it reduces the parallel scaling, as can be observed by evaluating the speedup). There are several other trivial optimizations that I can think of (but are not incorporated here for the same reason), such as for instance, exactly N (size of the dataset, or the number of lines in it) elements will be zero across the diagonals (or at i equals j for two nested loops that run through the matrix elements, with loop variables i and j) and at least half of the rest will be duplicates, so I can precompute the diagonals and just compute one half of the rest elements in the matrix. Avoiding this allows me to have more work, which in turn allows my parallelization to scale better (with increasing core count).
+
+---
+<h2 align = "center">
+License
+</h2>
+
+Permission is hereby granted to mortal entities of the Homo sapiens species to use the [code](https://github.com/Anirban166/Helios/blob/main/Source/Helios.c) free of charge, in whatever terms one might find it useful. Appropriate credits (© 2022 and onwards, [Anirban166](https://github.com/Anirban166)) should be provided for copies, modifications and re-distribution of other content in this repository (the logos, for instance). Otherwise, do [wtfywt](http://www.wtfpl.net/about/).
