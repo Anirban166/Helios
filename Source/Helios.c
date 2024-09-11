@@ -10,13 +10,13 @@
 #include <string.h>
 #include <unistd.h>
 
-// Function to import the data set:
+// Function to import the dataset:
 int importDataSet(char *fileName, int lineCount, double **dataSet)
 {
     FILE *filePointer = fopen(fileName, "r");
     if(!filePointer) 
     {
-        fprintf(stderr, "Unable to open the data set file!\n");
+        fprintf(stderr, "Invalid dataset!\n");
         return(1);
     }
     char buffer[4096];
@@ -48,13 +48,13 @@ int importDataSet(char *fileName, int lineCount, double **dataSet)
 
 int main(int argc, char *argv[]) 
 {
-  // Initializing the MPI execution environment along with the ranks, the count of them and the desired level of thread support:
+  // Initializing the MPI execution environment along with the ranks, their count, and the desired level of thread support:
   int rank, size, provided;
   MPI_Init_thread(&argc, &argv, MPI_THREAD_FUNNELED, &provided);  
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-  // Pointers for the data set and the distance matrix:
+  // Pointers for the dataset and the distance matrix:
   double **dataSet, **distanceMatrix; 
 
   // Processing command-line arguments:
@@ -82,7 +82,6 @@ int main(int argc, char *argv[])
   }
   else
   {
-    // if(!rank) fprintf(stdout, "\nNumber of lines: %d, Dimensionality: %d, Tile size: %d, Thread Count: %d, Filename: %s\n", N, DIM, tileSize, threadCount, inputFileName); 
     // Making all ranks import the dataset and then allocate memory for it:
     dataSet = (double**)malloc(sizeof(double*) * N);
     for(int i = 0; i < N; i++)
@@ -96,20 +95,20 @@ int main(int argc, char *argv[])
     }
   }
   
-  // Initializing variables to hold the timings and make rank 0 collect the start time:
+  // Initializing variables to hold the timings and making rank 0 collect the start time:
   double startTime, endTime;
   if(!rank) startTime = MPI_Wtime();
 
   // Initializing variables to hold the range for each rank: (one for sending, one for receiving)
   int *range, *localRange;
-  // Allocating memory for and initializing the entire range:
+  // Allocating memory for + initializing the entire range:
   range = (int *)malloc(sizeof(int) * N);
   if(!rank) 
   {
     for (int i = 0; i < N; ++i) 
       range[i] = i;
   }
-  // Assigning row size to each process rank based on the divisibility of the data set size to the number of ranks:
+  // Assigning row size to each process rank based on the divisibility of the dataset size to the number of ranks:
   int localRowSize = N / size;
   // Taking care of the special case for the last rank, and assigning memory for all of them:
   if(rank == (size - 1) && (N % size) != 0) 
@@ -122,7 +121,7 @@ int main(int argc, char *argv[])
   // Sending the range to work on for a rank (local to it), distributed accordingly (in order) among all the ranks using a scatter:
   int workloadSize = N / size;  
   MPI_Scatter(range, workloadSize, MPI_INT, localRange, workloadSize, MPI_INT, 0, MPI_COMM_WORLD);
-  // Increasing the size of the range for the last rank if not sufficient (for the leftover rows, if N doesn't divide size evenly):
+  // Increasing the size of the range for the last rank if not found to be sufficient (for the leftover rows, if N doesn't divide size evenly):
   if(rank == (size - 1) && (N % size) != 0) 
   {
     for(int i = workloadSize; i < localRowSize; i++) 
@@ -160,14 +159,13 @@ int main(int argc, char *argv[])
     }
   }
 
-  // Printing the elapsed time for the distance matrix computation:
   if(!rank) 
   {
     endTime = MPI_Wtime();
     fprintf(stdout, "Time taken to compute the distance matrix in parallel: %f seconds\n", endTime - startTime);   
   }
 
-  // Computing the local sum in all ranks and then sending those to rank 0 for a reduction on it:
+  // Computing the local sum in all ranks, then sending those values to rank 0 for a reduction on it:
   double globalSum, localSum = 0;  
   for(int i = 0; i < localRowSize; i++) 
   {
@@ -180,7 +178,7 @@ int main(int argc, char *argv[])
     fprintf(stdout, "Sum of all the distances computed: %f\n", globalSum);
   }
 
-  // Deallocating memory for the data set, distance matrix and range variables:
+  // Deallocating memory for the dataset, distance matrix, and range variables:
   free(range);
   free(localRange);  
   for(int i = 0; i < N; i++)
